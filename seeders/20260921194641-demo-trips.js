@@ -8,9 +8,9 @@ module.exports = {
         to: 'Могилев',
         departureAt: new Date('2026-09-10T10:00:00.000Z'),
         price: 150,
-        driver: 'Иван',
         seats: 40,
         rating: 4.8,
+        driverId: 1,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -19,9 +19,9 @@ module.exports = {
         to: 'Москва',
         departureAt: new Date('2026-09-10T08:30:00.000Z'),
         price: 200,
-        driver: 'Мария',
         seats: 40,
         rating: 4.5,
+        driverId: 2,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -30,9 +30,9 @@ module.exports = {
         to: 'Минск',
         departureAt: new Date('2026-09-11T14:15:00.000Z'),
         price: 180,
-        driver: 'Пётр',
         seats: 36,
         rating: 4.7,
+        driverId: 3,
         createdAt: new Date(),
         updatedAt: new Date()
       }

@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('./models'); // Sequelize: db.Trip, db.sequelize
+const db = require('./models');
 const app = express();
 app.use(express.json());
 const PORT = 3000;
@@ -8,26 +8,30 @@ const PORT = 3000;
 (async () => {
   try {
     await db.sequelize.authenticate();
-    console.log('✅ Подключение к PostgreSQL установлено');
+    console.log(' Подключение к PostgreSQL установлено');
   } catch (err) {
-    console.error('❌ Ошибка подключения к БД:', err.message);
+    console.error(' Ошибка подключения к БД:', err.message);
   }
 })();
 
-// GET /trips — все поездки
+// GET /trips — все поездки (с водителем)
 app.get('/trips', async (req, res, next) => {
   try {
-    const trips = await db.Trip.findAll();
+    const trips = await db.Trip.findAll({
+      include: [{ model: db.Driver, as: 'driver' }]
+    });
     res.json(trips);
   } catch (err) {
     next(err);
   }
 });
 
-// GET /trips/:id — одна поездка
+// GET /trips/:id — одна поездка (с водителем)
 app.get('/trips/:id', async (req, res, next) => {
   try {
-    const trip = await db.Trip.findByPk(req.params.id);
+    const trip = await db.Trip.findByPk(req.params.id, {
+      include: [{ model: db.Driver, as: 'driver' }]
+    });
     if (!trip) {
       return res.status(404).json({ error: 'Поездка не найдена' });
     }
@@ -37,12 +41,12 @@ app.get('/trips/:id', async (req, res, next) => {
   }
 });
 
-// POST /trips — создать
+// POST /trips — создать (с driverId)
 app.post('/trips', async (req, res, next) => {
   try {
-    const { from, to, departureAt, price, driver, seats, rating } = req.body;
+    const { from, to, departureAt, price, seats, rating, driverId } = req.body;
 
-    if (!from || !to || !departureAt || !price || !driver || !seats) {
+    if (!from || !to || !departureAt || !price || !seats) {
       return res.status(400).json({ error: 'Все поля обязательны' });
     }
 
@@ -51,9 +55,9 @@ app.post('/trips', async (req, res, next) => {
       to,
       departureAt,
       price,
-      driver,
       seats,
-      rating: rating || 0
+      rating: rating || 0,
+      driverId: driverId || null
     });
     res.status(201).json(newTrip);
   } catch (err) {
@@ -61,7 +65,7 @@ app.post('/trips', async (req, res, next) => {
   }
 });
 
-// PUT /trips/:id — обновить
+// PUT /trips/:id — обновить (с driverId)
 app.put('/trips/:id', async (req, res, next) => {
   try {
     const trip = await db.Trip.findByPk(req.params.id);
@@ -69,9 +73,9 @@ app.put('/trips/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Поездка не найдена' });
     }
 
-    const { from, to, departureAt, price, driver, seats, rating } = req.body;
+    const { from, to, departureAt, price, seats, rating, driverId } = req.body;
 
-    if (!from || !to || !departureAt || !price || !driver || !seats) {
+    if (!from || !to || !departureAt || !price || !seats) {
       return res.status(400).json({ error: 'Все поля обязательны' });
     }
 
@@ -80,9 +84,9 @@ app.put('/trips/:id', async (req, res, next) => {
       to,
       departureAt,
       price,
-      driver,
       seats,
-      rating: rating || 0
+      rating: rating || 0,
+      driverId: driverId || null
     });
     res.json(trip);
   } catch (err) {
@@ -104,6 +108,18 @@ app.delete('/trips/:id', async (req, res, next) => {
   }
 });
 
+// GET /drivers — все водители (со своими поездками)
+app.get('/drivers', async (req, res, next) => {
+  try {
+    const drivers = await db.Driver.findAll({
+      include: [{ model: db.Trip, as: 'trips' }]
+    });
+    res.json(drivers);
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.get('/', (req, res) => {
   res.send('Server is running');
 });
@@ -115,5 +131,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(` Server running on port ${PORT}`);
 });

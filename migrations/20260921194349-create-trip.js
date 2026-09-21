@@ -15,17 +15,11 @@ module.exports = {
       to: {
         type: Sequelize.STRING
       },
-      date: {
-        type: Sequelize.STRING
-      },
-      time: {
-        type: Sequelize.STRING
+      departureAt: {
+        type: Sequelize.DATE
       },
       price: {
         type: Sequelize.INTEGER
-      },
-      driver: {
-        type: Sequelize.STRING
       },
       seats: {
         type: Sequelize.INTEGER
