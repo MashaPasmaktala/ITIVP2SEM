@@ -1,10 +1,15 @@
 const express = require('express');
 const db = require('./models');
+const authRouter = require('./routes/auth');
+const profileRouter = require('./routes/profile');
+const adminRouter = require('./routes/admin');
 const app = express();
 app.use(express.json());
+app.use('/profile', profileRouter);
+app.use('/auth', authRouter);
+app.use('/admin', adminRouter);
 const PORT = 3000;
 
-// Проверка подключения к БД при старте
 (async () => {
   try {
     await db.sequelize.authenticate();
@@ -14,7 +19,7 @@ const PORT = 3000;
   }
 })();
 
-// GET /trips — все поездки (с водителем)
+
 app.get('/trips', async (req, res, next) => {
   try {
     const trips = await db.Trip.findAll({
@@ -26,7 +31,7 @@ app.get('/trips', async (req, res, next) => {
   }
 });
 
-// GET /trips/:id — одна поездка (с водителем)
+
 app.get('/trips/:id', async (req, res, next) => {
   try {
     const trip = await db.Trip.findByPk(req.params.id, {
@@ -41,7 +46,7 @@ app.get('/trips/:id', async (req, res, next) => {
   }
 });
 
-// POST /trips — создать (с driverId)
+
 app.post('/trips', async (req, res, next) => {
   try {
     const { from, to, departureAt, price, seats, rating, driverId } = req.body;
@@ -65,7 +70,7 @@ app.post('/trips', async (req, res, next) => {
   }
 });
 
-// PUT /trips/:id — обновить (с driverId)
+
 app.put('/trips/:id', async (req, res, next) => {
   try {
     const trip = await db.Trip.findByPk(req.params.id);
@@ -94,7 +99,7 @@ app.put('/trips/:id', async (req, res, next) => {
   }
 });
 
-// DELETE /trips/:id — удалить
+
 app.delete('/trips/:id', async (req, res, next) => {
   try {
     const trip = await db.Trip.findByPk(req.params.id);
@@ -108,7 +113,7 @@ app.delete('/trips/:id', async (req, res, next) => {
   }
 });
 
-// GET /drivers — все водители (со своими поездками)
+
 app.get('/drivers', async (req, res, next) => {
   try {
     const drivers = await db.Driver.findAll({
@@ -124,7 +129,7 @@ app.get('/', (req, res) => {
   res.send('Server is running');
 });
 
-// Глобальный обработчик ошибок
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Внутренняя ошибка сервера' });
