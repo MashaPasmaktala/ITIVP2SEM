@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title : 'Поездки' %></title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, Arial, sans-serif; max-width: 1100px; margin: 0 auto; padding: 0 20px 40px; color: #333; background: #f8f9fa; }
+
+    /* ==================== NAV ==================== */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: #fff; padding: 12px 24px; margin: 0 -20px 24px;
+      border-bottom: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    }
+    nav .nav-links { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: #0066cc; font-weight: 500; font-size: 15px; }
+    nav a:hover { color: #004499; }
+    nav .user-block { display: flex; gap: 12px; align-items: center; font-size: 14px; color: #555; flex-wrap: wrap; }
+    nav .user-block strong { color: #0066cc; }
+    nav .btn { padding: 6px 14px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500; }
+    nav .btn-primary { background: #0066cc; color: #fff !important; }
+    nav .btn-primary:hover { background: #0055aa; }
+    nav .btn-outline { border: 1px solid #0066cc; color: #0066cc !important; background: #fff; }
+    nav .btn-outline:hover { background: #f0f7ff; }
+
+    /* ==================== HEADINGS ==================== */
+    h1 { color: #222; margin-top: 24px; font-size: 28px; }
+
+    /* ==================== TABLE ==================== */
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f5f7fa; font-weight: 600; color: #555; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbfc; }
+
+    /* ==================== BUTTONS ==================== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      padding: 0 20px;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1;
+      border-radius: 6px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      box-sizing: border-box;
+      transition: background 0.15s;
+    }
+    .btn-primary { background: #0066cc; color: #fff; }
+    .btn-primary:hover { background: #0055aa; }
+    .btn-danger { background: #dc3545; color: #fff; }
+    .btn-danger:hover { background: #b02a37; }
+    .btn-secondary { background: #6c757d; color: #fff; }
+    .btn-secondary:hover { background: #565e64; }
+    .btn-sm { height: 32px; padding: 0 14px; font-size: 13px; }
+
+    /* ==================== FORMS ==================== */
+    form { max-width: 560px; margin-top: 24px; background: #fff; padding: 28px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    label { display: block; margin-top: 14px; font-weight: 600; font-size: 14px; color: #444; }
+    input, select { padding: 10px 12px; font-size: 14px; width: 100%; margin-top: 6px; border: 1px solid #ccd0d5; border-radius: 6px; font-family: inherit; background: #fff; }
+    input:focus, select:focus { outline: none; border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0,102,204,0.12); }
+    form button[type="submit"] { margin-top: 20px; padding: 11px 24px; background: #0066cc; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 600; }
+    form button[type="submit"]:hover { background: #0055aa; }
+
+    /* ==================== MESSAGES ==================== */
+    .error { background: #fff3f3; border-left: 4px solid #dc3545; color: #a0222e; padding: 14px 18px; border-radius: 6px; margin: 16px 0; }
+    .error ul { margin: 8px 0 0 20px; padding: 0; }
+
+    /* ==================== DETAIL CARD ==================== */
+    .detail-card { background: #fff; padding: 28px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-top: 20px; }
+    .detail-row { display: flex; padding: 12px 0; border-bottom: 1px solid #eee; }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { font-weight: 600; color: #666; width: 220px; flex-shrink: 0; }
+    .detail-value { color: #222; }
+
+    /* ==================== ACTIONS ==================== */
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .actions a,
+    .actions button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      padding: 0 20px;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1;
+      border-radius: 6px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    .actions form {
+      display: inline;
+      margin: 0;
+      padding: 0;
+      background: none;
+      box-shadow: none;
+      max-width: none;
+    }
+
+    /* Отбойник: кнопки внутри .actions не наследуют стили форм */
+    .actions form button,
+    .actions form button[type="submit"] {
+      margin: 0;
+      padding: 0 20px;
+      height: 40px;
+      font-size: 14px;
+      font-weight: 500;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      box-sizing: border-box;
+    }
+    .actions form button:hover {
+      background: #b02a37;
+    }
+
+    /* ==================== MISC ==================== */
+    .created-at { font-size: 12px; color: #999; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-left: 4px; }
+    .badge-admin { background: #ffe6cc; color: #b35900; }
+    .badge-user { background: #e6f0ff; color: #0055cc; }
+
+    /* ==================== AUTH FORMS ==================== */
+    .auth-form { max-width: 460px; margin: 40px auto; background: #fff; padding: 36px; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .auth-form h1 { margin-top: 0; text-align: center; }
+    .auth-form form { margin: 0; padding: 0; background: none; box-shadow: none; max-width: none; }
+    .auth-form button { width: 100%; padding: 12px; font-size: 15px; margin-top: 24px; background: #0066cc; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .auth-form button:hover { background: #0055aa; }
+    .auth-form .link { display: block; text-align: center; margin-top: 18px; font-size: 14px; color: #666; }
+    .auth-form .link a { color: #0066cc; text-decoration: none; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-links">
+      <a href="/">Главная</a>
+      <% if (user && user.role === 'admin') { %>
+        <a href="/add">+ Добавить поездку</a>
+        <a href="/admin/users">Пользователи</a>
+      <% } %>
+    </div>
+    <div class="user-block">
+      <% if (user) { %>
+        <span>Привет, <strong><%= user.email %></strong>
+          <span class="badge <%= user.role === 'admin' ? 'badge-admin' : 'badge-user' %>"><%= user.role %></span>
+        </span>
+        <a href="/auth/logout" class="btn btn-outline">Выйти</a>
+      <% } else { %>
+        <a href="/auth/login" class="btn btn-outline">Войти</a>
+        <a href="/auth/register" class="btn btn-primary">Регистрация</a>
+      <% } %>
+    </div>
+  </nav>

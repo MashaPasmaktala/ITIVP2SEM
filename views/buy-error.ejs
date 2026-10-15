@@ -1,0 +1,14 @@
+<%- include('partials/header', { user: user, title: 'Ошибка покупки' }) %>
+
+<div class="detail-card" style="text-align: center;">
+  <h1 style="color: #dc3545; margin-top: 0;">❌ Не удалось купить билет</h1>
+  <div class="error" style="display: inline-block; text-align: left;"><%= errorMessage %></div>
+  <p>Поездка: <strong><%= trip.from %> → <%= trip.to %></strong></p>
+</div>
+
+<div class="actions" style="justify-content: center;">
+  <a href="/item/<%= trip.id %>" class="btn btn-secondary">← К поездке</a>
+  <a href="/" class="btn btn-primary">К списку поездок</a>
+</div>
+
+<%- include('partials/footer') %>

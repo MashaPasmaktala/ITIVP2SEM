@@ -1,0 +1,23 @@
+<%- include('partials/header', { user: user, title: 'Вход' }) %>
+
+<div class="auth-form">
+  <h1>Вход</h1>
+
+  <% if (error) { %>
+    <div class="error"><%= error %></div>
+  <% } %>
+
+  <form method="POST" action="/auth/login-form">
+    <label>Email</label>
+    <input type="email" name="email" required>
+
+    <label>Пароль</label>
+    <input type="password" name="password" required>
+
+    <button type="submit">Войти</button>
+  </form>
+
+  <div class="link">Нет аккаунта? <a href="/auth/register">Зарегистрироваться</a></div>
+</div>
+
+<%- include('partials/footer') %>

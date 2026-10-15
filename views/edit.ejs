@@ -1,0 +1,46 @@
+<%- include('partials/header', { user: user, title: 'Редактировать поездку #' + trip.id }) %>
+
+<h1>Редактировать поездку #<%= trip.id %></h1>
+
+<% if (errors && errors.length > 0) { %>
+  <div class="error">
+    <strong>Ошибки:</strong>
+    <ul>
+      <% errors.forEach(e => { %>
+        <li><%= e %></li>
+      <% }) %>
+    </ul>
+  </div>
+<% } %>
+
+<form method="POST" action="/item/<%= trip.id %>/edit">
+  <label>Откуда *</label>
+  <input type="text" name="from" value="<%= trip.from %>" required>
+
+  <label>Куда *</label>
+  <input type="text" name="to" value="<%= trip.to %>" required>
+
+  <label>Дата и время отправления *</label>
+  <input type="datetime-local" name="departureAt" value="<%= new Date(trip.departureAt).toISOString().slice(0,16) %>" required>
+
+  <label>Цена, BYN * (≥ 0)</label>
+  <input type="number" name="price" min="0" step="0.01" value="<%= trip.price %>" required>
+
+  <label>Количество мест * (≥ 0)</label>
+  <input type="number" name="seats" min="0" value="<%= trip.seats %>" required>
+
+  <label>Рейтинг (0–5)</label>
+  <input type="number" name="rating" min="0" max="5" step="0.1" value="<%= trip.rating %>">
+
+  <label>Водитель</label>
+  <select name="driverId">
+    <option value="">— не назначен —</option>
+    <% drivers.forEach(d => { %>
+      <option value="<%= d.id %>" <%= trip.driverId == d.id ? 'selected' : '' %>><%= d.name %> (<%= d.phone %>)</option>
+    <% }) %>
+  </select>
+
+  <button type="submit">Сохранить</button>
+</form>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,21 @@
+<%- include('partials/header', { user: user, title: 'Билет оформлен' }) %>
+
+<div class="detail-card" style="text-align: center;">
+  <h1 style="color: #28a745; margin-top: 0;">✅ Билет успешно оформлен!</h1>
+
+  <p>Поездка <strong>#<%= trip.id %></strong></p>
+  <p><strong><%= trip.from %> → <%= trip.to %></strong></p>
+  <p>Дата отправления: <span class="date"><%= new Date(trip.departureAt).toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  }) %></span></p>
+  <p>Цена: <strong><%= trip.price %> BYN</strong></p>
+  <p>Пассажир: <strong><%= user.email %></strong></p>
+</div>
+
+<div class="actions" style="justify-content: center;">
+  <a href="/" class="btn btn-secondary">← К списку поездок</a>
+  <a href="/item/<%= trip.id %>" class="btn btn-primary">К поездке</a>
+</div>
+
+<%- include('partials/footer') %>

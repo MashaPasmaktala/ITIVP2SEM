@@ -1,0 +1,48 @@
+<%- include('partials/header', { user: user, title: 'Поездка #' + trip.id }) %>
+
+<h1>Поездка #<%= trip.id %></h1>
+
+<div class="detail-card">
+  <div class="detail-row"><div class="detail-label">Откуда</div><div class="detail-value"><%= trip.from %></div></div>
+  <div class="detail-row"><div class="detail-label">Куда</div><div class="detail-value"><%= trip.to %></div></div>
+  <div class="detail-row"><div class="detail-label">Дата отправления</div><div class="detail-value"><%= new Date(trip.departureAt).toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  }) %></div></div>
+  <div class="detail-row"><div class="detail-label">Цена</div><div class="detail-value"><%= trip.price %> BYN</div></div>
+  <div class="detail-row"><div class="detail-label">Свободных мест</div><div class="detail-value"><%= trip.seats %></div></div>
+  <div class="detail-row"><div class="detail-label">Рейтинг</div><div class="detail-value"><%= trip.rating %></div></div>
+  <div class="detail-row"><div class="detail-label">Водитель</div><div class="detail-value">
+    <% if (trip.driver) { %><%= trip.driver.name %> — <%= trip.driver.phone %> (стаж <%= trip.driver.experience %> лет)
+    <% } else { %><em>не назначен</em><% } %>
+  </div></div>
+  <div class="detail-row"><div class="detail-label">Создано</div><div class="detail-value"><%= new Date(trip.createdAt).toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }) %></div></div>
+</div>
+
+<div class="actions">
+  <a href="/" class="btn btn-secondary">← К списку</a>
+
+  <%# Кнопка покупки — только для залогиненного user и только если ещё не купил %>
+  <% if (user && user.role === 'user') { %>
+    <% if (alreadyBought) { %>
+      <button type="button" class="btn btn-secondary" disabled>✅ Билет уже куплен</button>
+    <% } else if (trip.seats <= 0) { %>
+      <button type="button" class="btn btn-secondary" disabled>Мест нет</button>
+    <% } else { %>
+      <form method="POST" action="/item/<%= trip.id %>/buy">
+        <button type="submit" class="btn btn-primary">💳 Купить билет</button>
+      </form>
+    <% } %>
+  <% } %>
+
+  <%# Управление — только админ %>
+  <% if (user && user.role === 'admin') { %>
+    <a href="/item/<%= trip.id %>/edit" class="btn btn-primary">Редактировать</a>
+    <form method="POST" action="/item/<%= trip.id %>/delete" onsubmit="return confirm('Удалить поездку #<%= trip.id %>?');">
+      <button type="submit" class="btn btn-danger">Удалить</button>
+    </form>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

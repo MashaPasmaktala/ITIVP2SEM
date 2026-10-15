@@ -1,0 +1,31 @@
+<%- include('partials/header', { user: user, title: 'Регистрация' }) %>
+
+<div class="auth-form">
+  <h1>Регистрация</h1>
+
+  <% if (error) { %>
+    <div class="error"><%= error %></div>
+  <% } %>
+
+  <form method="POST" action="/auth/register-form">
+    <label>Email</label>
+    <input type="email" name="email"
+           placeholder="you@gmail.com"
+           pattern="^[A-Za-z0-9._%+-]+@gmail\.com$"
+           title="Email должен быть в формате ...@gmail.com"
+           required>
+
+    <label>Пароль (не менее 6 символов, без пробелов)</label>
+    <input type="password" name="password"
+           minlength="6"
+           pattern="^\S{6,}$"
+           title="Не менее 6 символов, без пробелов"
+           required>
+
+    <button type="submit">Зарегистрироваться</button>
+  </form>
+
+  <div class="link">Уже есть аккаунт? <a href="/auth/login">Войти</a></div>
+</div>
+
+<%- include('partials/footer') %>
