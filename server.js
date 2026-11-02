@@ -1,140 +1,59 @@
+require('dotenv').config();
 const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const cors = require('cors');
 const db = require('./models');
+
+// Импорт middleware
+const authenticate = require('./middleware/auth');
+
+// Импорт роутеров
 const authRouter = require('./routes/auth');
-const profileRouter = require('./routes/profile');
+const tripsRouter = require('./routes/trips');
 const adminRouter = require('./routes/admin');
+
 const app = express();
-app.use(express.json());
-app.use('/profile', profileRouter);
-app.use('/auth', authRouter);
-app.use('/admin', adminRouter);
 const PORT = 3000;
 
-(async () => {
-  try {
-    await db.sequelize.authenticate();
-    console.log(' Подключение к PostgreSQL установлено');
-  } catch (err) {
-    console.error(' Ошибка подключения к БД:', err.message);
-  }
-})();
+// --- НАСТРОЙКА CORS И ПАРСЕРОВ ---
+app.use(cors({
+  origin: 'http://localhost:5173', // Разрешаем React
+  credentials: true                // Разрешаем передавать куки
+}));
+app.use(express.json());
+app.use(cookieParser());           // Парсер куки (для JWT)
+app.use(express.static(path.join(__dirname, 'public')));
 
+// --- АУТЕНТИФИКАЦИЯ (добавляет req.user, если есть токен) ---
+app.use(authenticate);
 
-app.get('/trips', async (req, res, next) => {
-  try {
-    const trips = await db.Trip.findAll({
-      include: [{ model: db.Driver, as: 'driver' }]
-    });
-    res.json(trips);
-  } catch (err) {
-    next(err);
-  }
-});
+// --- ПОДКЛЮЧЕНИЕ РОУТОВ ---
+app.use('/auth', authRouter);
+app.use('/trips', tripsRouter);
+app.use('/admin', adminRouter);
 
-
-app.get('/trips/:id', async (req, res, next) => {
-  try {
-    const trip = await db.Trip.findByPk(req.params.id, {
-      include: [{ model: db.Driver, as: 'driver' }]
-    });
-    if (!trip) {
-      return res.status(404).json({ error: 'Поездка не найдена' });
-    }
-    res.json(trip);
-  } catch (err) {
-    next(err);
-  }
-});
-
-
-app.post('/trips', async (req, res, next) => {
-  try {
-    const { from, to, departureAt, price, seats, rating, driverId } = req.body;
-
-    if (!from || !to || !departureAt || !price || !seats) {
-      return res.status(400).json({ error: 'Все поля обязательны' });
-    }
-
-    const newTrip = await db.Trip.create({
-      from,
-      to,
-      departureAt,
-      price,
-      seats,
-      rating: rating || 0,
-      driverId: driverId || null
-    });
-    res.status(201).json(newTrip);
-  } catch (err) {
-    next(err);
-  }
-});
-
-
-app.put('/trips/:id', async (req, res, next) => {
-  try {
-    const trip = await db.Trip.findByPk(req.params.id);
-    if (!trip) {
-      return res.status(404).json({ error: 'Поездка не найдена' });
-    }
-
-    const { from, to, departureAt, price, seats, rating, driverId } = req.body;
-
-    if (!from || !to || !departureAt || !price || !seats) {
-      return res.status(400).json({ error: 'Все поля обязательны' });
-    }
-
-    await trip.update({
-      from,
-      to,
-      departureAt,
-      price,
-      seats,
-      rating: rating || 0,
-      driverId: driverId || null
-    });
-    res.json(trip);
-  } catch (err) {
-    next(err);
-  }
-});
-
-
-app.delete('/trips/:id', async (req, res, next) => {
-  try {
-    const trip = await db.Trip.findByPk(req.params.id);
-    if (!trip) {
-      return res.status(404).json({ error: 'Поездка не найдена' });
-    }
-    await trip.destroy();
-    res.status(204).send();
-  } catch (err) {
-    next(err);
-  }
-});
-
-
-app.get('/drivers', async (req, res, next) => {
-  try {
-    const drivers = await db.Driver.findAll({
-      include: [{ model: db.Trip, as: 'trips' }]
-    });
-    res.json(drivers);
-  } catch (err) {
-    next(err);
-  }
-});
-
+// Тестовый роут
 app.get('/', (req, res) => {
   res.send('Server is running');
 });
 
-
+// --- ОБРАБОТКА ОШИБОК ---
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('❌ Ошибка сервера:', err.stack);
   res.status(500).json({ error: 'Внутренняя ошибка сервера' });
 });
 
+// --- ЗАПУСК ---
+(async () => {
+  try {
+    await db.sequelize.authenticate();
+    console.log('✅ Подключение к PostgreSQL установлено');
+  } catch (err) {
+    console.error('❌ Ошибка подключения к БД:', err.message);
+  }
+})();
+
 app.listen(PORT, () => {
-  console.log(` Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });

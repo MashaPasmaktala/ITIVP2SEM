@@ -1,36 +1,45 @@
 const jwt = require('jsonwebtoken');
+const db = require('../models');
 
-module.exports = (req, res, next) => {
-  // 1. Берём заголовок Authorization
+// 1. Функция проверки токена
+const authenticate = async (req, res, next) => {
+  let token = null;
+  
+  // Ищем токен в заголовке (для Postman/Thunder)
   const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Токен не предоставлен' });
+  if (authHeader) {
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') token = parts[1];
+  }
+  
+  // Ищем токен в Cookie (для React)
+  if (!token && req.cookies && req.cookies.token) {
+    token = req.cookies.token;
   }
 
-  // 2. Проверяем формат: "Bearer <token>"
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    return res.status(401).json({ error: 'Неверный формат токена' });
+  if (!token) {
+    req.user = null;
+    return next();
   }
 
-  const token = parts[1];
-
-  // 3. Верифицируем токен
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;   // { id, email, role, iat, exp }
+    const user = await db.User.findByPk(decoded.id, { attributes: ['id', 'email', 'role'] });
+    req.user = user ? user.toJSON() : null;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Недействительный токен' });
+    req.user = null;
+    next();
   }
 };
-module.exports.isAdmin = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Доступ запрещён. Требуется роль admin' });
-  }
+
+// 2. Функция проверки роли Админа
+const isAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Не авторизован' });
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Доступ запрещён' });
   next();
 };
+
+// 3. Правильный экспорт (сначала главная функция, потом isAdmin)
+module.exports = authenticate;
+module.exports.isAdmin = isAdmin;

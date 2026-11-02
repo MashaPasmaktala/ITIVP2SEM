@@ -40,43 +40,44 @@ router.post('/register', async (req, res, next) => {
   }
 });
 // POST /auth/login — вход
+// POST /auth/login — вход через API
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({ error: 'Email и пароль обязательны' });
     }
 
-    // Ищем пользователя по email
     const user = await db.User.findOne({ where: { email } });
-    if (!user) {
-      return res.status(401).json({ error: 'Неверный email или пароль' });
-    }
+    if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
 
-    // Сравниваем пароль с хешем
     const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Неверный email или пароль' });
-    }
+    if (!isValid) return res.status(401).json({ error: 'Неверный email или пароль' });
 
-    // Генерируем JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role
-      }
+    // 🔥 ГЛАВНОЕ: Сохраняем токен в HttpOnly Cookie!
+    res.cookie('token', token, {
+      httpOnly: true,
+      maxAge: 60 * 60 * 1000,
+      sameSite: 'lax'
     });
-  } catch (err) {
-    next(err);
-  }
+
+    res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
+  } catch (err) { next(err); }
+});
+
+router.get('/logout', (req, res) => {
+  res.clearCookie('token');
+  res.redirect('http://localhost:5173');
+});
+
+router.get('/me', (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Не авторизован' });
+  res.json(req.user);
 });
 module.exports = router;
