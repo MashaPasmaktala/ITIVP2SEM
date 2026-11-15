@@ -1,0 +1,170 @@
+### Запросы к API для расширения REST Client в VS Code
+### (установите расширение humao.rest-client и нажмите «Send Request» над запросом)
+### Порядок: 1) логин водителя → 2) создать поездку → дальше по списку.
+
+@baseUrl = http://localhost:3000
+
+### Проверка сервера и БД
+GET {{baseUrl}}/
+
+### ───────── АВТОРИЗАЦИЯ ─────────
+
+### Регистрация
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{ "email": "masha@test.com", "password": "123456", "name": "Маша" }
+
+### Вход водителем (токен сохраняется в переменную driver)
+# @name driver
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "ivan@test.com", "password": "123456" }
+
+### Вход пассажиром
+# @name passenger
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "anna@test.com", "password": "123456" }
+
+### Вход админом
+# @name admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@test.com", "password": "123456" }
+
+@driverToken = {{driver.response.body.token}}
+@passengerToken = {{passenger.response.body.token}}
+@adminToken = {{admin.response.body.token}}
+
+### Кто я
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{driverToken}}
+
+### ───────── CRUD ПОЕЗДОК ─────────
+
+### GET список (Model.find + фильтры, сортировка, пагинация)
+GET {{baseUrl}}/trips?from=Минск&sort=price&page=1&limit=5
+
+### Поиск по тегу (массив содержит значение)
+GET {{baseUrl}}/trips?tag=комфорт
+
+### POST создать поездку (Model.create) — водитель
+# @name newTrip
+POST {{baseUrl}}/trips
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{
+  "from": "Минск",
+  "to": "Пинск",
+  "departureAt": "2027-01-15T09:00:00.000Z",
+  "price": 32,
+  "seatsTotal": 3,
+  "stops": ["Слуцк", "Лунинец"],
+  "tags": ["комфорт", "утро"],
+  "options": { "smoking": false, "pets": true, "luggage": true, "music": true },
+  "description": "Выезд от ст. м. Малиновка"
+}
+
+@tripId = {{newTrip.response.body.id}}
+
+### GET по id (Model.findById + populate водителя)
+GET {{baseUrl}}/trips/{{tripId}}
+
+### PUT обновить (Model.findByIdAndUpdate) — меняются только переданные поля
+PUT {{baseUrl}}/trips/{{tripId}}
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{ "price": 35, "seatsTotal": 4 }
+
+### ───────── ВЛОЖЕННЫЕ МАССИВЫ ─────────
+
+### Добавить остановку ($push в массив stops)
+POST {{baseUrl}}/trips/{{tripId}}/stops
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{ "city": "Ганцевичи" }
+
+### Забронировать 2 места (атомарный $inc)
+# @name booking
+POST {{baseUrl}}/trips/{{tripId}}/book
+Authorization: Bearer {{passengerToken}}
+Content-Type: application/json
+
+{ "seats": 2 }
+
+@bookingId = {{booking.response.body.booking.id}}
+
+### Мои брони (populate trip → driver)
+GET {{baseUrl}}/trips/my-bookings
+Authorization: Bearer {{passengerToken}}
+
+### Изменить количество мест в брони
+PATCH {{baseUrl}}/trips/my-bookings/{{bookingId}}
+Authorization: Bearer {{passengerToken}}
+Content-Type: application/json
+
+{ "seats": 1 }
+
+### Оставить отзыв (push в массив reviews)
+# @name review
+POST {{baseUrl}}/trips/{{tripId}}/reviews
+Authorization: Bearer {{passengerToken}}
+Content-Type: application/json
+
+{ "rating": 5, "comment": "Отличная поездка!" }
+
+@reviewId = {{review.response.body._id}}
+
+### Изменить отзыв — обновление ЭЛЕМЕНТА МАССИВА позиционным оператором reviews.$
+PATCH {{baseUrl}}/trips/{{tripId}}/reviews/{{reviewId}}
+Authorization: Bearer {{passengerToken}}
+Content-Type: application/json
+
+{ "rating": 4, "comment": "Хорошо, но опоздали на 10 минут" }
+
+### Удалить отзыв ($pull)
+DELETE {{baseUrl}}/trips/{{tripId}}/reviews/{{reviewId}}
+Authorization: Bearer {{passengerToken}}
+
+### Отменить бронь (статус cancelled, места возвращаются)
+DELETE {{baseUrl}}/trips/my-bookings/{{bookingId}}
+Authorization: Bearer {{passengerToken}}
+
+### ───────── ПРОФИЛЬ ─────────
+
+### Мой профиль (вложенные документы profile и car)
+GET {{baseUrl}}/profile
+Authorization: Bearer {{driverToken}}
+
+### Обновить профиль
+PUT {{baseUrl}}/profile
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{ "profile": { "city": "Минск", "bio": "Вожу аккуратно" }, "car": { "color": "Чёрный" } }
+
+### Публичный профиль водителя (рейтинг через aggregation)
+GET {{baseUrl}}/users/{{driver.response.body.user.id}}/public
+
+### ───────── АДМИН ─────────
+
+### Статистика (aggregation pipeline: $group, $lookup, $unwind, $sort)
+GET {{baseUrl}}/admin/stats
+Authorization: Bearer {{adminToken}}
+
+### Пользователи
+GET {{baseUrl}}/admin/users?role=driver
+Authorization: Bearer {{adminToken}}
+
+### ───────── УДАЛЕНИЕ ─────────
+
+### DELETE поездку (findByIdAndDelete вернёт удалённый документ; брони удалятся каскадно)
+DELETE {{baseUrl}}/trips/{{tripId}}
+Authorization: Bearer {{driverToken}}

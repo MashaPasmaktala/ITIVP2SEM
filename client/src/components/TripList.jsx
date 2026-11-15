@@ -1,162 +1,219 @@
 import { useState, useEffect } from 'react';
-import { fetchTrips, createTrip, deleteTrip, updateTrip, buyTicket } from '../api';
+import { Link } from 'react-router-dom';
+import { fetchTrips, createTrip, deleteTrip, updateTrip, getMyBookings } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { errText, seatsText } from '../utils';
+import TripForm from './TripForm';
+import TripCard from './TripCard';
+import SeatsBooking from './SeatsBooking';
+
+const EMPTY_FILTERS = { from: '', to: '', date: '', maxPrice: '', seats: '', tag: '', sort: 'departureAt' };
+const PAGE_SIZE = 8;
 
 export default function TripList() {
-  const { user } = useAuth(); 
+  const { user } = useAuth();
   const [trips, setTrips] = useState([]);
+  const [meta, setMeta] = useState({ total: 0, pages: 1 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  const [form, setForm] = useState({ from: '', to: '', departureAt: '', price: '', seats: '', rating: '5' });
-  const [editingId, setEditingId] = useState(null);
-  const [filter, setFilter] = useState('');
 
-  const loadTrips = async (signal) => {
-    setIsLoading(true);
-    try {
-      const res = await fetchTrips({ signal });
-      const formatted = res.data.map(t => ({
-        ...t,
-        departureAt: new Date(t.departureAt).toISOString().slice(0, 16)
-      }));
-      setTrips(formatted);
-      setError(null);
-    } catch (err) {
-      if (err.name !== 'CanceledError') setError('Ошибка загрузки');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [filters, setFilters] = useState(EMPTY_FILTERS); // то, что в полях формы поиска
+  const [query, setQuery] = useState({ ...EMPTY_FILTERS, page: 1 }); // применённый поиск
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // 1. Отмена запроса при размонтировании (AbortController)
+  const [showForm, setShowForm] = useState(false);
+  const [editingTrip, setEditingTrip] = useState(null);
+  const [myBooked, setMyBooked] = useState({}); // { tripId: кол-во мест } — мои активные брони
+
+  const canPublish = user?.role === 'admin' || user?.role === 'driver';
+  const canManage = (trip) => user?.role === 'admin' || (user && trip.driver?.id === user.id);
+  const canBook = (trip) => (user?.role === 'user' || user?.role === 'driver') && trip.driver?.id !== user.id;
+
+  // 1. Загрузка с сервера при изменении поиска. AbortController отменяет старый запрос.
   useEffect(() => {
     const controller = new AbortController();
-    loadTrips(controller.signal);
+    const params = Object.fromEntries(Object.entries({ ...query, limit: PAGE_SIZE }).filter(([, v]) => v !== ''));
+    fetchTrips(params, { signal: controller.signal })
+      .then((res) => {
+        setTrips(res.data.items);
+        setMeta({ total: res.data.total, pages: res.data.pages });
+        setError(null);
+      })
+      .catch((err) => {
+        if (err.name !== 'CanceledError') setError(errText(err, 'Ошибка загрузки — сервер запущен?'));
+      })
+      .finally(() => setIsLoading(false));
     return () => controller.abort();
-  }, []);
+  }, [query, reloadKey]);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  // Мои активные брони — чтобы вместо кнопки «Забронировать» показать «Уже забронировано»
+  const isPassenger = user?.role === 'user' || user?.role === 'driver';
+  useEffect(() => {
+    if (!isPassenger) return;
+    getMyBookings()
+      .then((res) =>
+        setMyBooked(
+          Object.fromEntries(res.data.filter((b) => b.status === 'active' && b.trip).map((b) => [b.trip.id, b.seats]))
+        )
+      )
+      .catch(() => {});
+  }, [isPassenger, reloadKey]);
 
-  // 2. ДОБАВЛЕНИЕ / РЕДАКТИРОВАНИЕ (Оптимистично)
-  const handleSubmit = async (e) => {
+  const reload = () => {
+    setIsLoading(true);
+    setReloadKey((k) => k + 1);
+  };
+
+  const applySearch = (e) => {
     e.preventDefault();
-    const tripData = {
-      from: form.from, to: form.to,
-      departureAt: new Date(form.departureAt).toISOString(),
-      price: Number(form.price), seats: Number(form.seats), rating: Number(form.rating)
-    };
-
-    if (editingId) {
-      const old = [...trips];
-      setTrips(trips.map(t => t.id === editingId ? { ...t, ...tripData } : t)); // Оптимистично
-      setEditingId(null); setForm({ from: '', to: '', departureAt: '', price: '', seats: '', rating: '5' });
-      try { await updateTrip(editingId, tripData); } 
-      catch (err) { setTrips(old); setError('Ошибка редактирования'); }
-    } else {
-      const tempId = Date.now();
-      const newTrip = { ...tripData, id: tempId };
-      const old = [...trips];
-      setTrips([...trips, newTrip]); // Оптимистично
-      setForm({ from: '', to: '', departureAt: '', price: '', seats: '', rating: '5' });
-      try {
-        const res = await createTrip(tripData);
-        setTrips(prev => prev.map(t => t.id === tempId ? res.data : t)); // Замена ID
-      } catch (err) { setTrips(old); setError('Ошибка добавления'); }
-    }
+    setIsLoading(true);
+    setQuery({ ...filters, page: 1 });
   };
 
-  // 3. УДАЛЕНИЕ (Оптимистично)
-  const handleDelete = async (id) => {
-    const old = [...trips];
-    setTrips(trips.filter(t => t.id !== id)); 
-    try { await deleteTrip(id); } 
-    catch (err) { setTrips(old); setError('Ошибка удаления'); }
+  const resetSearch = () => {
+    setFilters(EMPTY_FILTERS);
+    setIsLoading(true);
+    setQuery({ ...EMPTY_FILTERS, page: 1 });
   };
 
-  // 4. ПОКУПКА БИЛЕТА
-  const handleBuy = async (id) => {
+  const goToPage = (page) => {
+    setIsLoading(true);
+    setQuery({ ...query, page });
+    window.scrollTo(0, 0);
+  };
+
+  const setFilter = (e) => setFilters({ ...filters, [e.target.name]: e.target.value });
+
+  // 2. ДОБАВЛЕНИЕ (оптимистично: сразу показываем, потом подменяем ответом сервера)
+  const handleCreate = async (tripData) => {
+    const tempId = `temp-${Date.now()}`;
+    const old = trips;
+    setTrips([{ ...tripData, id: tempId, seats: tripData.seatsTotal, status: 'scheduled', tags: [], stops: [] }, ...trips]);
+    setShowForm(false);
     try {
-      await buyTicket(id);
-      alert('Билет куплен!');
-      loadTrips(); // Перезагружаем, чтобы обновить места
+      const res = await createTrip(tripData);
+      setTrips((prev) => prev.map((t) => (t.id === tempId ? res.data : t)));
     } catch (err) {
-      alert(err.response?.data?.error || 'Ошибка');
+      setTrips(old);
+      setError(errText(err, 'Ошибка добавления'));
     }
   };
 
-  const filteredTrips = filter ? trips.filter(t => t.to.toLowerCase().includes(filter.toLowerCase())) : trips;
+  // 3. РЕДАКТИРОВАНИЕ (оптимистично)
+  const handleUpdate = async (tripData) => {
+    const id = editingTrip.id;
+    const old = trips;
+    setTrips(trips.map((t) => (t.id === id ? { ...t, ...tripData, stops: t.stops, tags: t.tags } : t)));
+    setEditingTrip(null);
+    try {
+      const res = await updateTrip(id, tripData);
+      setTrips((prev) => prev.map((t) => (t.id === id ? res.data : t)));
+    } catch (err) {
+      setTrips(old);
+      setError(errText(err, 'Ошибка редактирования'));
+    }
+  };
 
-  if (isLoading) return <div className="loading">⏳ Загрузка...</div>;
-  if (error && trips.length === 0) return (
-    <div className="error-screen"><p>❌ {error}</p><button onClick={() => loadTrips()}>Повторить</button></div>
-  );
+  // 4. УДАЛЕНИЕ (оптимистично, откат при ошибке)
+  const handleDelete = async (id) => {
+    if (!window.confirm('Удалить поездку? Все брони на неё тоже будут удалены.')) return;
+    const old = trips;
+    setTrips(trips.filter((t) => t.id !== id));
+    try {
+      await deleteTrip(id);
+    } catch (err) {
+      setTrips(old);
+      setError(errText(err, 'Ошибка удаления'));
+    }
+  };
+
+  // 5. После брони обновляем количество мест в карточке
+  const handleBooked = (data) => {
+    setTrips((prev) => prev.map((t) => (t.id === data.trip.id ? { ...t, seats: data.trip.seats } : t)));
+    setMyBooked((prev) => ({ ...prev, [data.trip.id]: data.booking.seats }));
+    alert('Места забронированы! Бронь появилась в разделе «Мои брони».');
+  };
 
   return (
     <div className="trip-list">
-      {error && <div className="error-banner">{error} <button onClick={() => setError(null)}>X</button></div>}
-
-      {/* ФОРМА (ТОЛЬКО ДЛЯ АДМИНА) */}
-      {user?.role === 'admin' && (
-        <form className="trip-form" onSubmit={handleSubmit}>
-          <h2>{editingId ? '✏️ Редактировать' : '➕ Добавить поездку'}</h2>
-          <div className="form-grid">
-            <input type="text" name="from" placeholder="Откуда" value={form.from} onChange={handleChange} required />
-            <input type="text" name="to" placeholder="Куда" value={form.to} onChange={handleChange} required />
-            <input type="datetime-local" name="departureAt" value={form.departureAt} onChange={handleChange} required />
-            <input type="number" name="price" placeholder="Цена" value={form.price} onChange={handleChange} min="0" required />
-            <input type="number" name="seats" placeholder="Мест" value={form.seats} onChange={handleChange} min="0" required />
-            <input type="number" name="rating" placeholder="Рейтинг" value={form.rating} onChange={handleChange} min="0" max="5" step="0.1" />
-          </div>
-          <div className="form-actions">
-            <button type="submit">{editingId ? 'Сохранить' : 'Добавить'}</button>
-            {editingId && <button type="button" onClick={() => { setEditingId(null); setForm({ from: '', to: '', departureAt: '', price: '', seats: '', rating: '5' }); }}>Отмена</button>}
-          </div>
+      <section className="hero">
+        <h1>Куда поедем?</h1>
+        <p>Находите попутчиков и экономьте на дороге</p>
+        <form className="search" onSubmit={applySearch}>
+          <input name="from" placeholder="Откуда" value={filters.from} onChange={setFilter} />
+          <input name="to" placeholder="Куда" value={filters.to} onChange={setFilter} />
+          <input name="date" type="date" value={filters.date} onChange={setFilter} />
+          <button type="submit" className="btn btn-primary">Найти</button>
         </form>
+        <div className="search-extra">
+          <input name="maxPrice" type="number" min="0" placeholder="Цена до, BYN" value={filters.maxPrice} onChange={setFilter} />
+          <select name="seats" value={filters.seats} onChange={setFilter}>
+            <option value="">Любое кол-во мест</option>
+            <option value="1">от 1 места</option>
+            <option value="2">от 2 мест</option>
+            <option value="3">от 3 мест</option>
+          </select>
+          <input name="tag" placeholder="Тег (например, комфорт)" value={filters.tag} onChange={setFilter} />
+          <select name="sort" value={filters.sort} onChange={setFilter}>
+            <option value="departureAt">Сначала ранние</option>
+            <option value="price">Сначала дешёвые</option>
+            <option value="-price">Сначала дорогие</option>
+            <option value="rating">По рейтингу</option>
+            <option value="new">Новые объявления</option>
+          </select>
+          <button type="button" className="btn btn-ghost" onClick={resetSearch}>Сбросить</button>
+        </div>
+      </section>
+
+      {error && (
+        <div className="error-banner">
+          {error} <button onClick={() => setError(null)}>✕</button>
+        </div>
       )}
 
-      <div className="filter">
-        <input type="text" placeholder="🔍 Фильтр по пункту назначения..." value={filter} onChange={(e) => setFilter(e.target.value)} />
+      {canPublish && !showForm && !editingTrip && (
+        <button className="btn btn-primary publish-btn" onClick={() => setShowForm(true)}>➕ Опубликовать поездку</button>
+      )}
+      {showForm && <TripForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
+      {editingTrip && <TripForm key={editingTrip.id} trip={editingTrip} onSubmit={handleUpdate} onCancel={() => setEditingTrip(null)} />}
+
+      <div className="list-header">
+        <h2>Найдено поездок: {meta.total}</h2>
+        <button className="btn btn-ghost" onClick={reload}>⟳ Обновить</button>
       </div>
 
-           <ul className="trips">
-        {filteredTrips.map(trip => (
-          <li key={trip.id} className="trip-item">
-            <div className="trip-info">
-              <span className="route"><strong>{trip.from}</strong> → <strong>{trip.to}</strong> <span className="rating">⭐ {trip.rating}</span></span>
-              <span className="meta">{trip.departureAt.replace('T', ' ')} | {trip.price} BYN | Мест: {trip.seats}</span>
-              
-              {/* БЛОК ДЛЯ ПРОСМОТРА БРОНЕЙ (только для админа/менеджера) */}
-              {(user?.role === 'admin' || user?.role === 'manager') && trip.bookings && trip.bookings.length > 0 && (
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', background: '#f0f7ff', padding: '5px', borderRadius: '4px' }}>
-                  <strong>Забронировали:</strong> {trip.bookings.map(b => b.user?.email).join(', ')}
-                </div>
-              )}
-            </div>
-            
-            <div className="trip-actions">
-              {/* Кнопки для АДМИНА / МЕНЕДЖЕРА */}
-              {(user?.role === 'admin' || user?.role === 'manager') && (
+      {isLoading ? (
+        <div className="loading">⏳ Загрузка...</div>
+      ) : trips.length === 0 ? (
+        <div className="card empty">Поездок не найдено. Попробуйте изменить параметры поиска.</div>
+      ) : (
+        <ul className="trips">
+          {trips.map((trip) => (
+            <TripCard key={trip.id} trip={trip}>
+              {canManage(trip) && (
                 <>
-                  <button onClick={() => { setForm({...trip, departureAt: trip.departureAt}); setEditingId(trip.id); window.scrollTo(0,0); }}>✏️</button>
-                  <button onClick={() => handleDelete(trip.id)}>🗑️</button>
+                  <button className="btn btn-ghost" onClick={() => { setEditingTrip(trip); setShowForm(false); window.scrollTo(0, 0); }}>✏️ Изменить</button>
+                  <button className="btn btn-ghost danger" onClick={() => handleDelete(trip.id)}>🗑️ Удалить</button>
                 </>
               )}
-              
-              {/* Кнопка для ЮЗЕРА (сделаем её контрастной) */}
-              {user?.role === 'user' && (
-                <button 
-                  className={`btn-buy ${trip.seats > 0 ? 'btn-buy-active' : ''}`} 
-                  onClick={() => handleBuy(trip.id)} 
-                  disabled={trip.seats <= 0}
-                >
-                  {trip.seats > 0 ? 'Купить билет' : 'Нет мест'}
-                </button>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+              {canBook(trip) &&
+                (myBooked[trip.id] ? (
+                  <Link to="/my-bookings" className="booked-link">✅ Забронировано {seatsText(myBooked[trip.id])}</Link>
+                ) : (
+                  <SeatsBooking trip={trip} onBooked={handleBooked} />
+                ))}
+            </TripCard>
+          ))}
+        </ul>
+      )}
+
+      {meta.pages > 1 && (
+        <div className="pagination">
+          <button className="btn btn-ghost" disabled={query.page <= 1} onClick={() => goToPage(query.page - 1)}>← Назад</button>
+          <span>Страница {query.page} из {meta.pages}</span>
+          <button className="btn btn-ghost" disabled={query.page >= meta.pages} onClick={() => goToPage(query.page + 1)}>Вперёд →</button>
+        </div>
+      )}
     </div>
   );
 }
